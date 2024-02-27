@@ -11,7 +11,7 @@ const ormconfig = {
     database: process.env.DB_NAME || 'so-app-power',
     synchronize: true,
     logging: false,
-    entities: [powerStation, loadDrop],
+    entities: [__dirname + '/../models/*.ts'],
     migrations: [__dirname + '/../migrations/*.ts'],
     subscribers: [__dirname + '/../subscribers/*.ts'],
     cli: {
