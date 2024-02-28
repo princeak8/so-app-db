@@ -15,7 +15,7 @@ export const dataSource = new DataSource(ormConfig);
             await dataSource.initialize();
             console.log('Database initialized');
         }catch(err) {
-            console.log("Error initializing database: ", err);
+            throw "Error initializing database: "+err;
         }
     }
 // interface DbInterface {

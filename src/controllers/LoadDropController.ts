@@ -5,7 +5,7 @@ import { LoadDropValidator } from "../validators/LoadDropValidator";
 import { AcknowledgeLoadDropValidator } from "../validators/AcknowledgeLoadDropValidator";
 import { AcknowledgeStationLoadDropValidator } from "../validators/AcknowledgeStationLoadDropValidator";
 import { validate } from "class-validator";
-import { validatorErrors } from "../helpers";
+import { validatorErrors, DBChecked } from "../helpers";
 import logger from "../logger";
 const LoadDropResource = require("../resources/loadDropResource");
 // const jc = require('json-cycle');
@@ -55,30 +55,37 @@ class PowerDropController {
             if (validationErrors.length > 0) {
                 const extractedValidationErrors = validatorErrors(validationErrors);
                 logger.error(extractedValidationErrors);
+
                 res.status(400).json({ errors: extractedValidationErrors });
                 return;
             }
 
-            // Check if the associated power station exists
-            const powerStation = await PowerStationService.getPowerStationByIdentifier(powerStationId);
-            if (!powerStation) {
-                logger.error('Power station not found');
-                res.status(400).json({ error: 'Power station not found' });
-                return;
-            }
+            //check if the DB is currently initialized
+            if(await DBChecked()) {
 
-            //Check if the load drop for a station has already been added by that exact time
-            let loadDrop = await LoadDropService.getLoadDropByStationAndTimeOfDrop(timeOfDrop, powerStation.id);
-            if(loadDrop) {
-                logger.error('Load Drop for this station has already been captured. powerStationId:'+powerStation.identifier);
-                res.status(400).json({ error: 'Load Drop for this station has already been captured' });
-                return
-            }
+                // Check if the associated power station exists
+                const powerStation = await PowerStationService.getPowerStationByIdentifier(powerStationId);
+                if (!powerStation) {
+                    logger.error('Power station not found');
+                    res.status(400).json({ error: 'Power station not found' });
+                    return;
+                }
 
-            data.powerStationId = powerStation.id;
-            loadDrop = await LoadDropService.save(data);
-            res.status(200).send(loadDrop);
-            // res.status(200).send(this.stringify(loadDrop));
+                //Check if the load drop for a station has already been added by that exact time
+                let loadDrop = await LoadDropService.getLoadDropByStationAndTimeOfDrop(timeOfDrop, powerStation.id);
+                if(loadDrop) {
+                    logger.error('Load Drop for this station has already been captured. powerStationId:'+powerStation.identifier);
+                    res.status(400).json({ error: 'Load Drop for this station has already been captured' });
+                    return
+                }
+
+                data.powerStationId = powerStation.id;
+                loadDrop = await LoadDropService.save(data);
+                res.status(200).send(loadDrop);
+                // res.status(200).send(this.stringify(loadDrop));
+            }else{
+                res.status(400).json({ error: 'Database error' });
+            }
         } catch (error) {
             logger.error('Error creating power drop', error);
             res.status(500).send('Error creating power drop: '+error);
@@ -99,22 +106,28 @@ class PowerDropController {
                 return;
             }
 
-            // Check if the loadDrop exists
-            const loadDrop = await LoadDropService.getLoadDrop(id);
-            if (!loadDrop) {
-                logger.error('Load Drop not found');
-                res.status(400).json({ error: 'Load Drop not found' });
-                return;
-            }
+            //check if the DB is currently initialized
+            if(await DBChecked()) {
+                console.log('got here');
+                // Check if the loadDrop exists
+                const loadDrop = await LoadDropService.getLoadDrop(id);
+                if (!loadDrop) {
+                    logger.error('Load Drop not found');
+                    res.status(400).json({ error: 'Load Drop not found' });
+                    return;
+                }
 
-            // Check if the loadDrop has been acknowledged
-            if(loadDrop.acknowledged_at != null) {
-                res.status(400).json({ error: 'Load Drop has already been acknowledged' });
-                return;
-            }
+                // Check if the loadDrop has been acknowledged
+                if(loadDrop.acknowledged_at != null) {
+                    res.status(400).json({ error: 'Load Drop has already been acknowledged' });
+                    return;
+                }
 
-            await LoadDropService.acknowledge(data);
-            res.status(200).send('success');
+                await LoadDropService.acknowledge(data);
+                res.status(200).send('success');
+            }else{
+                res.status(400).json({ error: 'Database error' });
+            }
         } catch (error) {
             logger.error('Error acknowledging power drop', error);
             res.status(500).send('Error acknowledging power drop');
@@ -135,16 +148,22 @@ class PowerDropController {
                 return;
             }
 
-            // Check if power station exists
-            const powerStation = await PowerStationService.getPowerStationByIdentifier(identifier);
-            if (!powerStation) {
-                logger.error('Power Station not found: load_drop/acknowledge_station');
-                res.status(400).json({ error: 'Power Station not found' });
-                return;
+            //check if the DB is currently initialized
+            if(await DBChecked()) {
+
+                // Check if power station exists
+                const powerStation = await PowerStationService.getPowerStationByIdentifier(identifier);
+                if (!powerStation) {
+                    logger.error('Power Station not found: load_drop/acknowledge_station');
+                    res.status(400).json({ error: 'Power Station not found' });
+                    return;
+                }
+                const loadDrops = await LoadDropService.getUnAcknowledgedStationLoadDrops(identifier);
+                await LoadDropService.acknowledgeStation(acknowledgedAt, loadDrops);
+                res.status(200).send('success');
+            }else{
+                res.status(400).json({ error: 'Database error' });
             }
-            const loadDrops = await LoadDropService.getUnAcknowledgedStationLoadDrops(identifier);
-            await LoadDropService.acknowledgeStation(acknowledgedAt, loadDrops);
-            res.status(200).send('success');
         } catch (error) {
             logger.error('Error acknowledging power drop', error);
             res.status(500).send('Error acknowledging power drop');
@@ -153,8 +172,16 @@ class PowerDropController {
 
     static getLatest = async (req: Request, res:Response) => {
         try{
-            const loadDrops = await LoadDropService.getLatestLoadDrops();
-            res.status(200).send(LoadDropResource.collection(loadDrops));
+            //check if the DB is currently initialized
+            let dbOk = await DBChecked();
+            console.log('is db ok?', dbOk);
+            if(dbOk) {
+                console.log('got here');
+                const loadDrops = await LoadDropService.getLatestLoadDrops();
+                res.status(200).send(LoadDropResource.collection(loadDrops));
+            }else{
+                res.status(400).json({ error: 'Database error' });
+            }
         } catch (error) {
             logger.error('Error fetching latest load drops', error);
             res.status(500).send('Error fetching latest drops');

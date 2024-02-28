@@ -1,7 +1,6 @@
 require('reflect-metadata');
 const express = require("express");
 require('dotenv').config();
-import { DataSource } from "typeorm"
 const ormConfig = require("./config/ormconfig").default;
 var cors = require("cors");
 import bodyParser from "body-parser";
@@ -11,6 +10,8 @@ var mqtt = require("mqtt");
 const http = require("http");
 import { createServer, IncomingMessage, ServerResponse, ClientRequest } from 'http';
 const queryString = require("query-string");
+import { wait } from "./helpers";
+
 
 import seedPowerStations from "./seeds/powerStations";
 import LoadDropController from "./controllers/LoadDropController";
@@ -40,20 +41,30 @@ app.use('/api', routes);
 // })
 // .catch((err) => console.log("Error initializing database: ", err));
 import database from "./database";
+import logger from "./logger";
 
 
-app.listen("3003", async () => {
-    await startDB();
-    // seedPowerStations();
-    console.log("Server started on port 3003");
-});
+startApp();
 
-async function startDB()
+async function startApp(count=0)
 {
     try{
         await database();
+        app.listen("3003", async () => {
+            console.log("Server started on port 3003");
+        });
+
     }catch(err:any) {
+        console.log('waiting 10seconds');
+        await wait(20000);
         console.log('Attempting to start DB again');
-        await startDB();
+        console.log('count:',count);
+        if(count < 10) {
+            count++;
+            await startApp(count);
+        }else{
+            logger.error("could not start app due to DB error: ",err);
+            console.log("could not start app due to DB error");
+        }
     }
 }
