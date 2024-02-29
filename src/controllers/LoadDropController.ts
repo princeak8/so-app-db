@@ -49,6 +49,7 @@ class PowerDropController {
         try{
             const { powerStationId, load, previousLoad, referenceLoad, timeOfDrop, calType } = req.body;
             const data = {powerStationId, load, previousLoad, referenceLoad, timeOfDrop, calType};
+            data.calType = String(data.calType);
             const loadDropValidator = new LoadDropValidator();
             Object.assign(loadDropValidator, data);
             const validationErrors = await validate(loadDropValidator);
