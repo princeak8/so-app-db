@@ -3,6 +3,7 @@ const ormConfig = require("./config/ormconfig").default;
 
 export const dataSource = new DataSource(ormConfig);
 
+
 // export default dataSource.initialize()
 //     .then(() => {
 //     dataSource.synchronize(true); 
