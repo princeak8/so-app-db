@@ -1,5 +1,6 @@
 import LoadDropService from "../services/LoadDropService";
 import PowerStationService from "../services/PowerStationService";
+import { inStorage, putInStorage, storage, remove } from "../services/LocalStorageService";
 import {Request, Response, RequestHandler} from 'express';
 import { LoadDropValidator } from "../validators/LoadDropValidator";
 import { AcknowledgeLoadDropValidator } from "../validators/AcknowledgeLoadDropValidator";
@@ -7,6 +8,7 @@ import { AcknowledgeStationLoadDropValidator } from "../validators/AcknowledgeSt
 import { validate } from "class-validator";
 import { validatorErrors, DBChecked } from "../helpers";
 import logger from "../logger";
+import { loadDropRequest } from "../types";
 const LoadDropResource = require("../resources/loadDropResource");
 // const jc = require('json-cycle');
 
@@ -63,7 +65,7 @@ class PowerDropController {
 
             //check if the DB is currently initialized
             if(await DBChecked()) {
-
+                // console.log('db checked successfuly');
                 // Check if the associated power station exists
                 const powerStation = await PowerStationService.getPowerStationByIdentifier(powerStationId);
                 if (!powerStation) {
@@ -85,12 +87,29 @@ class PowerDropController {
                 res.status(200).send(loadDrop);
                 // res.status(200).send(this.stringify(loadDrop));
             }else{
+                
                 res.status(400).json({ error: 'Database error' });
             }
         } catch (error) {
             logger.error('Error creating power drop', error);
             res.status(500).send('Error creating power drop: '+error);
         }
+    }
+
+    static saveLocally = (data:loadDropRequest) => {
+        if(inStorage('load-drops')) {
+            let loadDropsString = storage('load-drops');
+            let loadDrops = (loadDropsString != null) ? JSON.parse(loadDropsString) : [];
+            loadDrops.push(data);
+            putInStorage('load-drops', JSON.stringify(loadDrops));
+        }else{
+            let loadDrops:[loadDropRequest] = [data];
+            putInStorage('load-drops', JSON.stringify(loadDrops));
+        }
+    }
+
+    static saveLocalToDB = () => {
+
     }
 
     static acknowledge = async (req: Request, res:Response) => {
@@ -175,9 +194,9 @@ class PowerDropController {
         try{
             //check if the DB is currently initialized
             let dbOk = await DBChecked();
-            console.log('is db ok?', dbOk);
+            // console.log('is db ok?', dbOk);
             if(dbOk) {
-                console.log('got here');
+                // console.log('got here');
                 const loadDrops = await LoadDropService.getLatestLoadDrops();
                 res.status(200).send(LoadDropResource.collection(loadDrops));
             }else{
