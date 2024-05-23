@@ -50,7 +50,7 @@ async function startApp(count=0)
 {
     try{
         await database();
-        app.listen("3003", async () => {
+        app.listen("3004", async () => {
             console.log("Server started on port 3003");
         });
 
